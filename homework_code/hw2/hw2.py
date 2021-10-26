@@ -132,7 +132,7 @@ def probB():
 def wave_solution():
     f = lambda x : np.exp(-400*(x-0.5)**2) 
     
-    N = 1024 # use the solution from problem b
+    N = 256 # use the solution from problem b
     
     dt = 1/(2*N) 
     dx = 1/N
@@ -142,7 +142,7 @@ def wave_solution():
     # initial condition for first derivative of time
     for i in range(N+1):
         for j in range(N+1):
-            u[i,j,1] = dt*f((i-1)*dx)*f((i-1)*dx)
+            u[i,j,1] = dt*f((i)*dx)*f((j)*dx)
     
     # pointwise linear function:
     for t in range(2,N+1):
@@ -152,41 +152,38 @@ def wave_solution():
     
     return u
 
-# define a function for calculate the rror
-def error_cal(u_a,u_n,h0,h):
-    u_c = cp.deepcopy(u_n) # copy of nest matrix
-    for i in range(u_n.shape[0]):
-        for j in range(u_n.shape[1]):
-            u_c[i][j] = u_a[int(i*h/h0)][int(j*h/h0)]
-    # error = np.linalg.norm(u_c-u_n,np.inf)
-    error = np.max(np.abs((u_c-u_n)).reshape(1,-1))
-    return error
-
+# compute the wave equaiton in really fine grid
 def wave_solver(u):
     f = lambda x : np.exp(-400*(x-0.5)**2) 
     error_list = []
-    N = 100
-    for k in range(5,8):
+    for k in range(4,7):
         N = 2**k
-        dx = 1/(2*N)
-        dt = 1/N
+        dt = 1/(2*N)
+        dx = 1/N
         u_new = np.zeros([N+1,N+1,N+1])
         
-        for i in range(1,N+1):
-            for j in range(1,N+1):
-                u_new[i,j,2] = dt*f((i-1)*dx)*f((j-1)*dx);
+        for i in range(N+1):
+            for j in range(N+1):
+                u_new[i,j,1] = dt*f((i)*dx)*f((j)*dx);
 
     
     
-        for n in range(3,N+1):
-            for i in range(2,N):
-                for j in range(2,N):
+        for n in range(2,N+1):
+            for i in range(1,N):
+                for j in range(1,N):
                     u_new[i,j,n] = (dt**2/dx**2)*(u_new[i+1,j,n-1]+u_new[i,j+1,n-1]+u_new[i-1,j,n-1]+u_new[i,j-1,n-1]-4*u_new[i,j,n-1])-u_new[i,j,n-2]+2*u_new[i,j,n-1]
-
-        error_list.append(np.linalg.norm((u-u_new[::2**(10-k),::2**(10-k),
-                                            ::2**(10-k)]).reshape(1,-1,-1),
-                                         np.inf))
-        return error_list
+                    
+        m = u_new - u[::2**(8-k),::2**(8-k),::2**(8-k)]
+        m = m.reshape([1,1,-1])
+        error = np.max(m)
+        error_list.append(error)
+    plt.figure()
+    plt.plot(np.array([4,5,6]),-np.log2(error_list),label='error plot')
+    plt.plot(np.array([4,5,6]),np.array([8,10,12]),label='slope 2 reference')
+    plt.xlabel('number of grid (2^x)')
+    plt.ylabel('-log(norm)')
+    plt.savefig('wave_sol.jpg')
+    plt.legend()
 #%%
 if __name__ == '__main__':
     x0 = np.zeros([10,1])
@@ -218,5 +215,5 @@ if __name__ == '__main__':
     # probB()
     
     # problem C
-    # u = wave_solution()
-    # wave_solver(u)
+    u = wave_solution()
+    error = wave_solver(u)
