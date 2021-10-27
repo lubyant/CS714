@@ -10,6 +10,8 @@ import numpy.linalg as ling
 import copy as cp
 from scipy import interpolate
 import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
+
 
 #%%
 # Here is the secion for question A
@@ -102,6 +104,45 @@ def convergence_rate():
     plt.xlabel('Differnce between the conditioning number')
     plt.ylabel('Number of iterations to converge')
     plt.savefig('SCGD_rate_2.jpg')
+
+# question A(d)
+
+
+# question A(e)
+def sp_solve():
+    # function for x
+    f = lambda x: np.exp(-(x-0.5)**2/(2*0.04**2))
+    
+    N = 20
+    h = 1/(N-1)
+    # construct the matrix D
+    dig1 = -2 * np.ones([1,N]).flatten()
+    dig2 = np.ones([1,N-1]).flatten()
+    matrix_D = np.diag(dig1) + np.diag(dig2, k = 1) + np.diag(dig2, k=-1)
+    matrix_D[0,0] = h**2
+    matrix_D[N-1,N-1] = h**2
+    matrix_D[0,1] = 0
+    matrix_D[N-1,N-2] = 0
+    
+    
+    # construct the vector b
+    b = np.zeros([N,1])
+    for i in range(len(b)):
+        b[i] = f(i*h)
+    b[0] = 0
+    b[-1] = 0
+    
+    # construct 3d matrix by kronecker product
+    I = np.eye(N)
+    A = np.kron(np.kron(matrix_D,I),I)
+    + np.kron(np.kron(I,matrix_D),I)
+    + np.kron(np.kron(I,I),matrix_D)
+    A = A/h**2
+    
+    B = np.kron(np.kron(b,b),b)
+    
+    x = spsolve(A, B)
+    return x
     
 #%%
 # Here is the secession for question B
@@ -186,34 +227,37 @@ def wave_solver(u):
     plt.legend()
 #%%
 if __name__ == '__main__':
-    x0 = np.zeros([10,1])
+    # x0 = np.zeros([10,1])
     
-    x = np.linspace(3,10,10).reshape(-1,1)
-    A = 2*np.eye(10) + np.eye(10,k=1) + np.eye(10,k=-1)
+    # x = np.linspace(3,10,10).reshape(-1,1)
+    # A = 2*np.eye(10) + np.eye(10,k=1) + np.eye(10,k=-1)
 
-    b = np.matmul(A,x).reshape(-1,1)
-    # Problem A(a)
-    test,a = sgd(A,x0,b,maxiter=1000)
-    print('Testing the Steepest GD')
-    print('Testing case: ', np.round(x.flatten(),3))
-    print('Compute by the code: ', np.round(test.flatten(),3))
-    print('Error : ', np.round((test - x).flatten(),3))
+    # b = np.matmul(A,x).reshape(-1,1)
+    # # Problem A(a)
+    # test,a = sgd(A,x0,b,maxiter=1000)
+    # print('Testing the Steepest GD')
+    # print('Testing case: ', np.round(x.flatten(),3))
+    # print('Compute by the code: ', np.round(test.flatten(),3))
+    # print('Error : ', np.round((test - x).flatten(),3))
     
     
-    # Problem A(b)
-    print('Testing Conjugate GD')
-    test,a = scgd(A,x0,b,maxiter=1000)
-    print('Testing case: ', np.round(x.flatten(),3))
-    print('Compute by the code: ', np.round(test.flatten(),3))
-    print('Error : ', np.round((test - x).flatten(),3))    
+    # # Problem A(b)
+    # print('Testing Conjugate GD')
+    # test,a = scgd(A,x0,b,maxiter=1000)
+    # print('Testing case: ', np.round(x.flatten(),3))
+    # print('Compute by the code: ', np.round(test.flatten(),3))
+    # print('Error : ', np.round((test - x).flatten(),3))    
     
-    # Problem A(c)
+    # # Problem A(c)
     convergence_rate()
+    
+    # problem A(e)
+    x = sp_solve()
     
     #%%
     # problem B
     # probB()
     
     # problem C
-    u = wave_solution()
-    error = wave_solver(u)
+    # u = wave_solution()
+    # error = wave_solver(u)
