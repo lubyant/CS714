@@ -11,8 +11,7 @@ import copy as cp
 from scipy import interpolate
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
-
-
+import numpy.linalg as nplng
 #%%
 # Here is the secion for question A
 # question A (a)
@@ -111,9 +110,9 @@ def convergence_rate():
 # question A(e)
 def sp_solve():
     # function for x
-    f = lambda x: np.exp(-(x-0.5)**2/(2*0.04**2))
+    f = lambda x: -np.exp(-(x-0.5)**2/(2*0.04**2))
     
-    N = 20
+    N = 100
     h = 1/(N-1)
     # construct the matrix D
     dig1 = -2 * np.ones([1,N]).flatten()
@@ -142,8 +141,87 @@ def sp_solve():
     B = np.kron(np.kron(b,b),b)
     
     x = spsolve(A, B)
-    return x
+    sol = x.reshape(N,N,N)
     
+    # plotting 3d
+    # x0 = np.linspace(0,1,N)
+    # y0 = np.linspace(0,1,N)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(projection='3d')
+    # x,y = np.meshgrid(x0,y0)
+    # ax.plot_surface(x, y, sol[0,:,:], color='green')
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_zlabel('u')
+    # plt.title('Profile of FD solution')
+    
+    # plot the projection
+    plt.figure()
+    plt.imshow(sol[0,:,:])
+    plt.xlabel("x")
+    plt.ylabel("y",rotation="horizontal",labelpad=20)
+    plt.colorbar()
+    plt.show()
+    
+    plt.figure()
+    plt.imshow(sol[9,:,:])
+    plt.xlabel("x")
+    plt.ylabel("y",rotation="horizontal",labelpad=20)
+    plt.colorbar()
+    plt.show()
+    
+    plt.figure()
+    plt.imshow(sol[18,:,:])
+    plt.xlabel("x")
+    plt.ylabel("y",rotation="horizontal",labelpad=20)
+    plt.colorbar()
+    plt.show()
+    return x
+
+# implement a matrix free method by Gauss-Sedel    
+def mf_solve():
+    f = lambda x: -np.exp(-(x-0.5)**2/(2*0.04**2))
+    
+    N = 100
+    h = 1/(N-1) 
+    x = np.linspace(0,1,N)
+    y = np.linspace(0,1,N)
+    zz = np.linspace(0,1,N)
+    
+    u = np.zeros([N,N,N])
+    u_0 = np.ones([N,N,N])
+    
+    error = 1
+    while error>1/(1/h+1)**2:
+        u_0 = cp.deepcopy(u)
+        for z in range(1,u.shape[2]-1):
+            for j in range(1,u.shape[1]-1):
+                for i in range(1,u.shape[0]-1):
+                    u[i,j,z] = (u[i+1,j,z] + u[i-1,j,z] +u[i,j+1,z] + u[i,j-1,z] + u[i,j,z+1] + u[i,j,z-1] - h**2*f(x[i])*f(y[j])*f(zz[z]))/8
+        error = nplng.norm(u - u_0)
+        print(error)
+    
+    sol = u
+    plt.figure()
+    plt.imshow(sol[:,:,0])
+    plt.xlabel("x")
+    plt.ylabel("y",rotation="horizontal",labelpad=20)
+    plt.colorbar()
+    plt.show()
+    
+    plt.figure()
+    plt.imshow(sol[:,:,50])
+    plt.xlabel("x")
+    plt.ylabel("y",rotation="horizontal",labelpad=20)
+    plt.colorbar()
+    plt.show()
+    
+    plt.figure()
+    plt.imshow(sol[:,:,N-1])
+    plt.xlabel("x")
+    plt.ylabel("y",rotation="horizontal",labelpad=20)
+    plt.colorbar()
+    plt.show()
 #%%
 # Here is the secession for question B
 def probB():
@@ -233,7 +311,7 @@ if __name__ == '__main__':
     # A = 2*np.eye(10) + np.eye(10,k=1) + np.eye(10,k=-1)
 
     # b = np.matmul(A,x).reshape(-1,1)
-    # # Problem A(a)
+    # # # Problem A(a)
     # test,a = sgd(A,x0,b,maxiter=1000)
     # print('Testing the Steepest GD')
     # print('Testing case: ', np.round(x.flatten(),3))
@@ -249,15 +327,17 @@ if __name__ == '__main__':
     # print('Error : ', np.round((test - x).flatten(),3))    
     
     # # Problem A(c)
-    convergence_rate()
+    # convergence_rate()
     
-    # problem A(e)
-    x = sp_solve()
+    # # problem A(e)
+    # x = sp_solve() # part a
+    mf_solve() # part b
+    # x = cg_solve() # part c
     
-    #%%
-    # problem B
+    # #%%
+    # # problem B
     # probB()
     
-    # problem C
+    # # problem C
     # u = wave_solution()
     # error = wave_solver(u)
