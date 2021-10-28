@@ -12,8 +12,8 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 import numpy.linalg as nplng
-#%%
-# Here is the secion for question A
+#%%             Here is the secion for question A
+# 
 # question A (a)
 # implement the steepest gradient descent
 def sgd(A, x0, b, tol=1e-4, maxiter=100):
@@ -105,8 +105,30 @@ def convergence_rate():
     plt.savefig('SCGD_rate_2.jpg')
 
 # question A(d)
-
-
+def condition_number():
+    # condtion number = 100
+    arr1 = np.linspace(0.1,10,100).flatten() # uniform distribution
+    arr2 = np.zeros([100,1]).flatten() # cluster 
+    arr2[:10] = 0.1
+    arr2[30:60] = 1
+    arr2[90:99] = 10
+    
+    # generate two matrices for two conditions sereis
+    A1 = np.diag(arr1)
+    A2 = np.diag(arr2)
+    
+    # call the scgd
+    x0 = np.zeros([100,1])
+    x = np.linspace(3,10,100).reshape(-1,1)
+    b1 = np.matmul(A1,x).reshape(-1,1)
+    d1, iterations1 = scgd(A1, x0, b1, tol=1e-4, maxiter=100)
+    
+    b2 = np.matmul(A2,x).reshape(-1,1)
+    d2, iterations2 = scgd(A2, x0, b2, tol=1e-4, maxiter=100)
+    
+    print(iterations1)
+    print(iterations2)
+    
 # question A(e)
 def sp_solve():
     # function for x
@@ -222,8 +244,48 @@ def mf_solve():
     plt.ylabel("y",rotation="horizontal",labelpad=20)
     plt.colorbar()
     plt.show()
-#%%
-# Here is the secession for question B
+    
+# implement a method for SCGD
+def cg_solve():
+    # function for x
+    f = lambda x: -np.exp(-(x-0.5)**2/(2*0.04**2))
+    
+    N = 30
+    h = 1/(N-1)
+    # construct the matrix D
+    dig1 = -2 * np.ones([1,N]).flatten()
+    dig2 = np.ones([1,N-1]).flatten()
+    matrix_D = np.diag(dig1) + np.diag(dig2, k = 1) + np.diag(dig2, k=-1)
+    matrix_D[0,0] = h**2
+    matrix_D[N-1,N-1] = h**2
+    matrix_D[0,1] = 0
+    matrix_D[N-1,N-2] = 0
+    
+    
+    # construct the vector b
+    b = np.zeros([N,1])
+    for i in range(len(b)):
+        b[i] = f(i*h)
+    b[0] = 0
+    b[-1] = 0
+    
+    # construct 3d matrix by kronecker product
+    I = np.eye(N)
+    A = np.kron(np.kron(matrix_D,I),I)
+    + np.kron(np.kron(I,matrix_D),I)
+    + np.kron(np.kron(I,I),matrix_D)
+    A = A/h**2
+    
+    B = np.kron(np.kron(b,b),b)
+    
+    # call the SCGD I define
+    x0 = np.zeros([N**3,1])
+    test,a = scgd(A,x0,B,maxiter=1000)
+    print(test)
+    print(a)
+    
+#%%            Here is the secession for question B 
+# 
 def probB():
     
     norm_list = []
@@ -246,8 +308,8 @@ def probB():
     plt.ylabel('Inf norm for sampling error')
     plt.savefig('problemB.jpg') 
 
-#%%
-# Here is the sesesion for the question C
+#%%         Here is the sesesion for the question C
+# 
 def wave_solution():
     f = lambda x : np.exp(-400*(x-0.5)**2) 
     
@@ -303,41 +365,44 @@ def wave_solver(u):
     plt.ylabel('-log(norm)')
     plt.savefig('wave_sol.jpg')
     plt.legend()
-#%%
+#%%   main function for grader :)
 if __name__ == '__main__':
-    # x0 = np.zeros([10,1])
+    x0 = np.zeros([10,1])
     
-    # x = np.linspace(3,10,10).reshape(-1,1)
-    # A = 2*np.eye(10) + np.eye(10,k=1) + np.eye(10,k=-1)
+    x = np.linspace(3,10,10).reshape(-1,1)
+    A = 2*np.eye(10) + np.eye(10,k=1) + np.eye(10,k=-1)
 
-    # b = np.matmul(A,x).reshape(-1,1)
-    # # # Problem A(a)
-    # test,a = sgd(A,x0,b,maxiter=1000)
-    # print('Testing the Steepest GD')
-    # print('Testing case: ', np.round(x.flatten(),3))
-    # print('Compute by the code: ', np.round(test.flatten(),3))
-    # print('Error : ', np.round((test - x).flatten(),3))
+    b = np.matmul(A,x).reshape(-1,1)
+    # Problem A(a)
+    test,a = sgd(A,x0,b,maxiter=1000)
+    print('Testing the Steepest GD')
+    print('Testing case: ', np.round(x.flatten(),3))
+    print('Compute by the code: ', np.round(test.flatten(),3))
+    print('Error : ', np.round((test - x).flatten(),3))
     
     
-    # # Problem A(b)
-    # print('Testing Conjugate GD')
-    # test,a = scgd(A,x0,b,maxiter=1000)
-    # print('Testing case: ', np.round(x.flatten(),3))
-    # print('Compute by the code: ', np.round(test.flatten(),3))
-    # print('Error : ', np.round((test - x).flatten(),3))    
+    # Problem A(b)
+    print('Testing Conjugate GD')
+    test,a = scgd(A,x0,b,maxiter=1000)
+    print('Testing case: ', np.round(x.flatten(),3))
+    print('Compute by the code: ', np.round(test.flatten(),3))
+    print('Error : ', np.round((test - x).flatten(),3))    
     
-    # # Problem A(c)
-    # convergence_rate()
+    # Problem A(c)
+    convergence_rate()
     
-    # # problem A(e)
-    # x = sp_solve() # part a
+    # Problem A(d)
+    condition_number()
+    
+    # problem A(e)
+    x = sp_solve() # part a
     mf_solve() # part b
-    # x = cg_solve() # part c
+    x = cg_solve() # part c
     
-    # #%%
-    # # problem B
-    # probB()
+    #%%
+    # problem B
+    probB()
     
-    # # problem C
-    # u = wave_solution()
-    # error = wave_solver(u)
+    # problem C
+    u = wave_solution()
+    error = wave_solver(u)
