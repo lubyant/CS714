@@ -12,6 +12,7 @@ from scipy import interpolate
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 import numpy.linalg as nplng
+from scipy.sparse import csc_matrix
 #%%             Here is the secion for question A
 # 
 # question A (a)
@@ -51,7 +52,27 @@ def scgd(A, x0, b, tol=1e-4, maxiter=100):
             r0 = cp.deepcopy(r)
             x0 = cp.deepcopy(x)    
             p0 = cp.deepcopy(p)
-       
+
+# this solver explicitly work for question A.(d)
+def scgd_tracer(A, x0, b, tol=1e-4, maxiter=100):
+    # initial residual
+    r0 = b - np.matmul(A,x0)
+    p0 = cp.deepcopy(r0)
+    norm_list = []
+    for i in range(maxiter):
+        w = np.matmul(A,p0)
+        alpha = np.dot(r0.transpose(),r0)/np.dot(p0.transpose(),w)
+        x = x0 + alpha*p0
+        r = r0 - alpha*w  
+        norm_list.append(nplng.norm(r))
+        if ling.norm(r) < tol:           
+            return (x,i,norm_list)
+        else:
+            beta = np.dot(r.transpose(),r)/np.dot(r0.transpose(),r0)
+            p = r + beta*p0    
+            r0 = cp.deepcopy(r)
+            x0 = cp.deepcopy(x)    
+            p0 = cp.deepcopy(p)
     
 # question A(c)
 def convergence_rate():
@@ -83,7 +104,7 @@ def convergence_rate():
     # rate vs conditioning number
     iter_list = []
     for n in range(5,12):
-        arr = np.zeros([100,1]).flatten()
+        arr = np.zeros([1000,1]).flatten()
         arr[0] = np.exp(-n)
         arr[-1] = np.exp(n)
         
@@ -91,8 +112,8 @@ def convergence_rate():
         A = np.diag(arr)
         
         # call the scgd
-        x0 = np.zeros([100,1])
-        x = np.linspace(3,10,100).reshape(-1,1)
+        x0 = np.zeros([1000,1])
+        x = np.linspace(3,10,1000).reshape(-1,1)
         b = np.matmul(A,x).reshape(-1,1)
         d, iterations = scgd(A, x0, b, tol=1e-4, maxiter=100)
         
@@ -121,20 +142,27 @@ def condition_number():
     x0 = np.zeros([100,1])
     x = np.linspace(3,10,100).reshape(-1,1)
     b1 = np.matmul(A1,x).reshape(-1,1)
-    d1, iterations1 = scgd(A1, x0, b1, tol=1e-4, maxiter=100)
+    d1, iterations1, res_norm1 = scgd_tracer(A1, x0, b1, tol=1e-4, maxiter=100)
     
     b2 = np.matmul(A2,x).reshape(-1,1)
-    d2, iterations2 = scgd(A2, x0, b2, tol=1e-4, maxiter=100)
+    d2, iterations2,res_norm2 = scgd_tracer(A2, x0, b2, tol=1e-4, maxiter=100)
     
-    print(iterations1)
-    print(iterations2)
+    print('Uniform eigenvalue converge iterations: ', iterations1)
+    print('Sparse eigenvalue converge iterations: ', iterations2)
+    plt.figure()
+    plt.plot(np.linspace(1,iterations1+1,iterations1+1).flatten(),res_norm1,label='uniform matrix')
+    plt.plot(np.linspace(1,iterations2+1,iterations2+1).flatten(),res_norm2,label='sparse matrix')
+    plt.legend()
+    plt.xlabel('Number of iterations')
+    plt.ylabel('Norm of residual')
+    plt.savefig('matrix_sparsity_rate.jpg')
     
 # question A(e)
 def sp_solve():
     # function for x
     f = lambda x: -np.exp(-(x-0.5)**2/(2*0.04**2))
     
-    N = 100
+    N = 30
     h = 1/(N-1)
     # construct the matrix D
     dig1 = -2 * np.ones([1,N]).flatten()
@@ -161,6 +189,10 @@ def sp_solve():
     A = A/h**2
     
     B = np.kron(np.kron(b,b),b)
+    
+    # convert to csc (optional)
+    A = csc_matrix(A)
+    B = csc_matrix(B)
     
     x = spsolve(A, B)
     sol = x.reshape(N,N,N)
@@ -250,37 +282,47 @@ def cg_solve():
     # function for x
     f = lambda x: -np.exp(-(x-0.5)**2/(2*0.04**2))
     
-    N = 30
-    h = 1/(N-1)
-    # construct the matrix D
-    dig1 = -2 * np.ones([1,N]).flatten()
-    dig2 = np.ones([1,N-1]).flatten()
-    matrix_D = np.diag(dig1) + np.diag(dig2, k = 1) + np.diag(dig2, k=-1)
-    matrix_D[0,0] = h**2
-    matrix_D[N-1,N-1] = h**2
-    matrix_D[0,1] = 0
-    matrix_D[N-1,N-2] = 0
+    iterations = []
     
-    
-    # construct the vector b
-    b = np.zeros([N,1])
-    for i in range(len(b)):
-        b[i] = f(i*h)
-    b[0] = 0
-    b[-1] = 0
-    
-    # construct 3d matrix by kronecker product
-    I = np.eye(N)
-    A = np.kron(np.kron(matrix_D,I),I)
-    + np.kron(np.kron(I,matrix_D),I)
-    + np.kron(np.kron(I,I),matrix_D)
-    A = A/h**2
-    
-    B = np.kron(np.kron(b,b),b)
-    
-    # call the SCGD I define
-    x0 = np.zeros([N**3,1])
-    test,a = scgd(A,x0,B,maxiter=1000)
+    for N in range(10,33):
+        h = 1/(N-1)
+        # construct the matrix D
+        dig1 = -2 * np.ones([1,N]).flatten()
+        dig2 = np.ones([1,N-1]).flatten()
+        matrix_D = np.diag(dig1) + np.diag(dig2, k = 1) + np.diag(dig2, k=-1)
+        matrix_D[0,0] = h**2
+        matrix_D[N-1,N-1] = h**2
+        matrix_D[0,1] = 0
+        matrix_D[N-1,N-2] = 0
+        
+        
+        # construct the vector b
+        b = np.zeros([N,1])
+        for i in range(len(b)):
+            b[i] = f(i*h)
+        b[0] = 0
+        b[-1] = 0
+        
+        # construct 3d matrix by kronecker product
+        I = np.eye(N)
+        A = np.kron(np.kron(matrix_D,I),I)
+        + np.kron(np.kron(I,matrix_D),I)
+        + np.kron(np.kron(I,I),matrix_D)
+        A = A/h**2
+        
+        B = np.kron(np.kron(b,b),b)
+        
+        # call the SCGD I define
+        x0 = np.zeros([N**3,1])
+        test,a = scgd(A,x0,B,maxiter=1000)
+        
+        iterations.append(a)
+        
+    plt.figure()
+    plt.plot(np.linspace(10,33,23).flatten(),iterations)    
+    plt.xlabel('Grid size')
+    plt.ylabel('Number of iteration to converge')
+    plt.savefig('questionAE3.jpg')
     print(test)
     print(a)
     
@@ -375,34 +417,53 @@ if __name__ == '__main__':
     b = np.matmul(A,x).reshape(-1,1)
     # Problem A(a)
     test,a = sgd(A,x0,b,maxiter=1000)
+    print('Question A(a)')
     print('Testing the Steepest GD')
     print('Testing case: ', np.round(x.flatten(),3))
     print('Compute by the code: ', np.round(test.flatten(),3))
     print('Error : ', np.round((test - x).flatten(),3))
-    
+    print()
     
     # Problem A(b)
+    print('Question A(b)')
     print('Testing Conjugate GD')
     test,a = scgd(A,x0,b,maxiter=1000)
     print('Testing case: ', np.round(x.flatten(),3))
     print('Compute by the code: ', np.round(test.flatten(),3))
     print('Error : ', np.round((test - x).flatten(),3))    
-    
+    print()
     # Problem A(c)
+    print('Question A(c)')
     convergence_rate()
+    print()
     
     # Problem A(d)
+    print('Question A(d)')
     condition_number()
+    print()
+    
+    #%%
+    #-------------this part takes long time to compute------------------------#
+    # make sure you have 32G memory
     
     # problem A(e)
+    print('Question A(e) i')
     x = sp_solve() # part a
+    print()
+    print('Question A(e) ii')
     mf_solve() # part b
+    print()
+    print('Question A(e) iii')
     x = cg_solve() # part c
+    print()
     
     #%%
     # problem B
+    print('Question B')
     probB()
+    print()
     
     # problem C
+    print('Question C(a)')
     u = wave_solution()
     error = wave_solver(u)
