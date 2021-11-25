@@ -65,14 +65,34 @@ def cheb_solver(k):
     
     return U
 
+def sol(B):
+    k = 7
+    N = 2**k
+    delta_t = 4/N**2
+    deltax = 1/N
+    timepoint = int(N**2/256)
+    U= np.zeros([N+1,N+1,timepoint+1]) 
+
+    u_x = lambda x,B : np.sin(B*np.pi*x)
+   
+    for i in range(N+1):
+        for j in range(N+1):
+            U[i,j,1] = delta_t*u_x((i)*deltax,B)*u_x((j)*deltax,B)
+    n_l = np.linspace(2,timepoint,timepoint-1,dtype=int)
+    for n in n_l:
+        for i in range(1,N):
+            for j in range(1,N):
+                U[i,j,n] = (delta_t**2/deltax**2)*(U[i+1,j,n-1]+U[i,j+1,n-1]+U[i-1,j,n-1]+U[i,j-1,n-1]-4*U[i,j,n-1])-U[i,j,n-2]+2*U[i,j,n-1]
+    return U
+
 # define a new solver for problem e initial condition
 def cheb_solver_e(k=6):
     N = 2**k
-    delta_t = 4/N**2
-    timepoint = int(N**2/128)
+    delta_t = 3/N**2
+    deltax = 1/N
+    timepoint = int(N**2/4)
     # print(timepoint)
-    U = np.zeros([N+1,N+1,timepoint+1])    
-    U_a = np.zeros([N+1,N+1,timepoint+1])   
+  
 
     D,x = cheb(N)
     I = np.eye(N-1)
@@ -81,7 +101,7 @@ def cheb_solver_e(k=6):
     L = np.kron(I,D2) + np.kron(D2,I)
     L_square = L**2    
     
-    B_l = [2,4,8,16,32,64]
+    B_l = [2,4,8,16,32]
     u_x = lambda x,B : np.sin(B*np.pi*x)
     u_t = lambda x,B : np.sin(np.sqrt(2)*B*np.pi*x)
     
@@ -89,13 +109,16 @@ def cheb_solver_e(k=6):
     error_Spec = []
     
     for B in B_l:
+        U = np.zeros([N+1,N+1,timepoint+1])    
+        U_a = np.zeros([N+1,N+1,timepoint+1]) 
         
-        deltax = 1/N
         # Analytical solution
         for i in range(N+1):
             for j in range(N+1):
                 for k in range(timepoint+1):
-                    U_a = u_x((i)*deltax,B)*u_x((j)*deltax,B)*u_t((k)*delta_t,B)/(np.sqrt(2)*B*np.pi)
+                    U_a[i,j,k] = u_x((i)*deltax,B)*u_x((j)*deltax,B)*u_t((k)*delta_t,B)/(np.sqrt(2)*B*np.pi)
+        U_a_2 = sol(B) 
+           
         # FD method
         for i in range(N+1):
             for j in range(N+1):
@@ -106,6 +129,7 @@ def cheb_solver_e(k=6):
                 for j in range(1,N):
                     U[i,j,n] = (delta_t**2/deltax**2)*(U[i+1,j,n-1]+U[i,j+1,n-1]+U[i-1,j,n-1]+U[i,j-1,n-1]-4*U[i,j,n-1])-U[i,j,n-2]+2*U[i,j,n-1]
         error_FD.append(LA.norm((U-U_a).flatten(),np.inf))
+        
         # Spectrum method
         Us = np.zeros([N+1,N+1,timepoint+1])
         Ut = np.zeros([N+1,N+1])
@@ -154,6 +178,10 @@ if __name__ == '__main__':
         
     # plot the error
     plt.figure()
-    plt.plot(np.log10(error_FD),label='FD')
-    plt.plot(np.log10(error_Spec),label='Spectrum')
+    B_l = [2,4,8,16,32]
+    plt.plot(B_l,np.log10(error_FD),label='FD')
+    plt.plot(B_l,np.log10(error_Spec),label='Spectrum')
+    plt.plot(B_l,-3*np.ones([len(B_l),1]))
     plt.legend()
+    plt.xlabel('B value')
+    plt.ylabel('Log10 error')
