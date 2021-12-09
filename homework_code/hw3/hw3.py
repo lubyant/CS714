@@ -65,14 +65,44 @@ def cheb_solver(k):
     
     return U
 
+def sol(B):
+    k = 7
+    N = 2**k
+    delta_t = 3/N**2
+    deltax = 1/N
+    timepoint = int(N**2/4)
+    D,x = cheb(N)
+    I = np.eye(N-1)
+    D2 = D**2
+    D2 = D2[1:N,1:N]
+    L = np.kron(I,D2) + np.kron(D2,I)
+    L_square = L**2    
+
+    u_x = lambda x,B : np.sin(B*np.pi*x)
+    u_t = lambda x,B : np.sin(np.sqrt(2)*B*np.pi*x)
+    Us = np.zeros([N+1,N+1,timepoint+1])
+    Ut = np.zeros([N+1,N+1])   
+    lap_Ut = np.zeros([N+1,N+1])
+    n_l = np.linspace(2,timepoint,timepoint-1,dtype=int)
+    for i in range(N+1):
+        for j in range(N+1):
+            Ut[i,j] = u_x(x[i],B)*u_x(x[j],B)
+            lap_Ut[i,j] = -2*B**2*np.pi**2*Ut[i,j] 
+    Us[:,:,1] = delta_t*(Ut+delta_t**2/6*lap_Ut)
+    for n in n_l:
+        Us[1:N,1:N,n] = 2*Us[1:N,1:N,n-1]-Us[1:N,1:N,n-2]
+        +delta_t**2*(L@Us[1:N,1:N,n-1].flatten().reshape(-1,1)).reshape(-1,N-1)
+        +1/12*delta_t**4*((L_square@Us[1:N,1:N,n-1].flatten().reshape(-1,1)).reshape(-1,N-1))
+    return Us
+
 # define a new solver for problem e initial condition
 def cheb_solver_e(k=6):
     N = 2**k
-    delta_t = 4/N**2
-    timepoint = int(N**2/128)
+    delta_t = 3/N**2
+    deltax = 1/N
+    timepoint = int(N**2/4)
     # print(timepoint)
-    U = np.zeros([N+1,N+1,timepoint+1])    
-    U_a = np.zeros([N+1,N+1,timepoint+1])   
+  
 
     D,x = cheb(N)
     I = np.eye(N-1)
@@ -81,7 +111,7 @@ def cheb_solver_e(k=6):
     L = np.kron(I,D2) + np.kron(D2,I)
     L_square = L**2    
     
-    B_l = [2,4,8,16,32,64]
+    B_l = [2,4,8,16,32]
     u_x = lambda x,B : np.sin(B*np.pi*x)
     u_t = lambda x,B : np.sin(np.sqrt(2)*B*np.pi*x)
     
@@ -89,13 +119,16 @@ def cheb_solver_e(k=6):
     error_Spec = []
     
     for B in B_l:
+        U = np.zeros([N+1,N+1,timepoint+1])    
+        U_a = np.zeros([N+1,N+1,timepoint+1]) 
         
-        deltax = 1/N
         # Analytical solution
         for i in range(N+1):
             for j in range(N+1):
                 for k in range(timepoint+1):
-                    U_a = u_x((i)*deltax,B)*u_x((j)*deltax,B)*u_t((k)*delta_t,B)/(np.sqrt(2)*B*np.pi)
+                    U_a[i,j,k] = u_x((i)*deltax,B)*u_x((j)*deltax,B)*u_t((k)*delta_t,B)/(np.sqrt(2)*B*np.pi)
+
+           
         # FD method
         for i in range(N+1):
             for j in range(N+1):
@@ -106,6 +139,7 @@ def cheb_solver_e(k=6):
                 for j in range(1,N):
                     U[i,j,n] = (delta_t**2/deltax**2)*(U[i+1,j,n-1]+U[i,j+1,n-1]+U[i-1,j,n-1]+U[i,j-1,n-1]-4*U[i,j,n-1])-U[i,j,n-2]+2*U[i,j,n-1]
         error_FD.append(LA.norm((U-U_a).flatten(),np.inf))
+        
         # Spectrum method
         Us = np.zeros([N+1,N+1,timepoint+1])
         Ut = np.zeros([N+1,N+1])
@@ -118,42 +152,46 @@ def cheb_solver_e(k=6):
         for n in n_l:
             Us[1:N,1:N,n] = 2*Us[1:N,1:N,n-1]-Us[1:N,1:N,n-2]
             +delta_t**2*(L@Us[1:N,1:N,n-1].flatten().reshape(-1,1)).reshape(-1,N-1)
-            +1/12*delta_t**4*(L_square@Us[1:N,1:N,n-1].flatten().reshape(-1,1)).reshape(-1,N-1)
-        
-        error_Spec.append(LA.norm((Us-U_a).flatten(),np.inf))
+            +1/12*delta_t**4*((L_square@Us[1:N,1:N,n-1].flatten().reshape(-1,1)).reshape(-1,N-1))
+        U_a = sol(B)
+        error_Spec.append(LA.norm((Us-U_a[::2,::2,::4]).flatten(),np.inf))
         
        
     return error_FD,error_Spec
     
 if __name__ == '__main__':
-    # #%% Problem c
+    #%% Problem c
     
-    # # compute an solution with fine grid
-    # k = 7 # fine grid == 2^7
-    # U_sol = cheb_solver(k)
+    # compute an solution with fine grid
+    k = 7 # fine grid == 2^7
+    U_sol = cheb_solver(k)
 
-    # # compute the cheb sol from different grid size
-    # grid_size = np.linspace(4,6,3,dtype=int)
-    # error_list = []
-    # for k in grid_size:
-    #     U_cheb = cheb_solver(k)
-    #     diff = U_cheb - U_sol[0::2**(7-k),0::2**(7-k),0::4**(7-k)]
-    #     error_list.append(LA.norm(diff.flatten(),np.inf))
+    # compute the cheb sol from different grid size
+    grid_size = np.linspace(4,6,3,dtype=int)
+    error_list = []
+    for k in grid_size:
+        U_cheb = cheb_solver(k)
+        diff = U_cheb - U_sol[0::2**(7-k),0::2**(7-k),0::4**(7-k)]
+        error_list.append(LA.norm(diff.flatten(),np.inf))
         
-    # # plot the error 
-    # plt.figure()
-    # plt.plot(grid_size,-np.log2(error_list),label='Error plot')
-    # plt.plot(grid_size,4*grid_size,label='Slope 4 reference')
-    # plt.xlabel('Log grid size')
-    # plt.ylabel('Log error for infinity norm')
-    # plt.legend()
+    # plot the error 
+    plt.figure()
+    plt.plot(grid_size,-np.log2(error_list),label='Error plot')
+    plt.plot(grid_size,4*grid_size,label='Slope 4 reference')
+    plt.xlabel('Log grid size')
+    plt.ylabel('Log error for infinity norm')
+    plt.legend()
     
     #%% Problem e
         
-    error_Spec,error_FD = cheb_solver_e()     
+    error_FD,error_Spec = cheb_solver_e()     
         
     # plot the error
     plt.figure()
-    plt.plot(np.log10(error_FD),label='FD')
-    plt.plot(np.log10(error_Spec),label='Spectrum')
+    B_l = [2,4,8,16,32]
+    plt.plot(B_l,np.log10(error_FD),label='FD')
+    plt.plot(B_l,np.log10(error_Spec),label='Spectrum')
+    plt.plot(B_l,-3*np.ones([len(B_l),1]))
     plt.legend()
+    plt.xlabel('B value')
+    plt.ylabel('Log10 error')
