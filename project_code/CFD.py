@@ -7,13 +7,14 @@ Created on Tue Dec  7 21:18:59 2021
 import numpy as np
 import copy as cp
 from numpy import linalg as LA
+import matplotlib.pyplot as plt
 # Navier Stokes Solvers
 #%% Pysical setting
 # physical domain
 Lx = 30
 Ly = 30
-nx = 3
-ny = 3
+nx = 32
+ny = 32
 x0 = Lx/2
 y0 = Ly/2
 
@@ -57,8 +58,8 @@ def u_star(u,v,dt,dxi,dyi,nu):
     u_s = cp.deepcopy(u)
     for j in range(jmin,jmax+1):
         for i in range(imin+1, jmax+1):
-            v_cur = (v[i-1,j] + v[i+1,j] + v[i,j-1] + v[i,j+1])/4
-            lap_op = (u[i+1,j] - 2*u[i,j] + u[i-1,j])*dxi**2 + (u[i,j+1]-2*u[i,j]+u[i,j-1])**dyi**2
+            v_cur = (v[i-1,j] + v[i-1,j+1] + v[i,j] + v[i,j+1])/4
+            lap_op = (u[i+1,j] - 2*u[i,j] + u[i-1,j])*dxi**2 + (u[i,j+1]-2*u[i,j]+u[i,j-1])*dyi**2
             u_s[i,j] = u[i,j] + dt*(nu*lap_op-u[i,j]*(u[i+1,j]-u[i-1,j])*0.5*dxi
                                     -v_cur*(u[i,j+1]-u[i,j-1])*0.5*dyi)
     return u_s       
@@ -68,51 +69,77 @@ def v_star(u,v,dt,dxi,dyi,nu):
     v_s = cp.deepcopy(v)
     for j in range(jmin+1,jmax+1):
         for i in range(imin,imax+1):
-            u_cur = (u[i-1,j] + u[i+1,j] + u[i,j-1] + u[i,j+1])/4
-            lap_op = (v[i+1,j] - 2*v[i,j] + v[i-1,j])*dxi**2 + (v[i,j+1]-2*v[i,j]+v[i,j-1])**dyi**2
+            u_cur = (u[i,j-1] + u[i,j] + u[i+1,j-1] + u[i+1,j])/4
+            lap_op = (v[i+1,j] - 2*v[i,j] + v[i-1,j])*dxi**2 + (v[i,j+1]-2*v[i,j]+v[i,j-1])*dyi**2
             v_s[i,j] = v[i,j] + dt*(nu*lap_op-u_cur*(v[i+1,j]-v[i-1,j])*0.5*dxi
                                     -v[i,j]*(v[i,j+1]-v[i,j-1])*0.5*dyi)
     return v_s
 
 #%% pressure poisson solver
 # d2p/dx2 + d2p/dy2 = - rho/dt du_s/dx + dv_s/dy
-
-def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
-    L = np.zeros([nx,ny])
-    for j in range(ny):
-        for i in range(nx):
-            # L( i +( j −1)∗nx , i +( j −1)∗nx)=2∗ d xi ˆ2+2∗ d yi ˆ 2;
-            L[i+(j-1)*nx,i+(j-1)*nx] = 2*dxi**2 + 2*dyi**2
-            for ii in range(i-1,i+2,2):
-                if ii >0 and ii <= nx:
-                    
-# def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
-#     P0 = cp.deepcopy(P)
-#     error = np.inf
-#     while error > 1/(P.shape[0]*P.shape[1]):
-#         for i in range(imin,imax+1):
-#             for j in range(imin,imax+1):
-                
-#                 if i == imin: # left bc
-#                     P0[i,j] = P0[i+1,j]
-#                 elif i == P.shape[0]-1: #right bc
-#                     P0[i,j] = P0[i-1,j]
-#                 elif j == jmin: # bottom bc
-#                     P0[i,j] = P0[i,j+1]
-#                 elif j == jmax: # top bc
-#                     P0[i,j] = P0[i,j-1]
+# def pressure_poisson_matrix():
+#     L = np.zeros([nx*ny,nx*ny])
+#     for j in range(ny):
+#         for i in range(nx):
+#             L[i-1+(j-1)*nx, i + (j)*nx] == 2*dxi**2+2*dyi**2
+#             for ii in range(i-1,i+2,2):
+#                 if ii>-1 and ii<=nx:
+#                     L[i+(j)*nx,ii+(j)*nx] = -dxi**2
 #                 else:
-#                     rhs = -rho/dt*((u_s[i+1,j] - u_s[i,j])/dx + (v_s[i,j+1] - v_s[i,j])/dy)
-#                     P0[i,j] = (dy**2*(P[i-1,j] + P[i+1,j]) + dx**2*(P[i,j-1]+P[i,j+1]) -rhs )/(2*dx**2+2*dy**2)
-#         error = LA.norm(P0.flatten() - P.flatten(), np.inf)
-#         P = P0
-#     return P
+#                     L[i+(j)*nx,i+(j)*nx] -= dxi**2
+            
+#             for jj in range(j-1,j+2,2):
+#                 if jj>-1 and jj<= ny:
+#                     L[i+(j)*nx,i+(jj)*nx] = -dyi**2
+#                 else:
+#                     L[i+(j)*nx,i+(j)*nx] -= dyi**2
+#     L[0,:] = 0
+#     L[0,0] = 1
+#     return L  
+# def pressure_poisson_matrix():
+#     diag1 = -2*np.ones([1,nx]).flatten()
+#     diag2 = np.ones([1,nx-1]).flatten()
+#     A = np.diag(diag1) + np.diag(diag2,k=-1) + np.diag(diag2,k=1)
+#     A[0,0] = -1
+#     A[-1,-1] = -1
+    
+    
+#     M = np.kron(A,A)/dx**2
+# L =         pressure_poisson_matrix()  
+def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
+    P0 = cp.deepcopy(P)
+    error = np.inf
+    while error > 1/(P.shape[0]*P.shape[1]):
+        for i in range(imin,imax+1):
+            for j in range(imin,imax+1):
+                rhs = rho/dt*((u_s[i+1,j] - u_s[i,j])/dx + (v_s[i,j+1] - v_s[i,j])/dy)
+                if i == imin and j == jmin: # (0,0)
+                    P0[i,j] = 1/(dx**2+dy**2)*(dy**2*P[i+1,j]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+                elif i == imax-1 and j == jmin: #right bc
+                    P0[i,j] = 1/(dx**2+dy**2)*(dy**2*P[i+1,j]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+                elif i == imin and j == jmax-1: # bottom bc
+                    P0[i,j] = 1/(dx**2+dy**2)*(dy**2*P[i+1,j]+dx**2*P[i,j-1]-dx**2*dy**2*rhs)
+                elif j == jmax-1 and j == jmax-1: # top bc
+                    P0[i,j] = 1/(dx**2+dy**2)*(dy**2*P[i-1,j]+dx**2*P[i,j-1]-dx**2*dy**2*rhs)
+                elif i == imin:
+                    P0[i,j] = 1/(2*dx**2+dy**2)*(dy**2*P[i+1,j]+dx**2*P[i,j-1]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+                elif i == imax-1:
+                    P0[i,j] = 1/(2*dx**2+dy**2)*(dy**2*P[i-1,j]+dx**2*P[i,j-1]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+                elif j == jmin:
+                    P0[i,j] = 1/(dx**2+2*dy**2)*(dy**2*P[i+1,j]+dy**2*P[i-1,j]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+                elif j == jmax-1:
+                    P0[i,j] = 1/(dx**2+2*dy**2)*(dy**2*P[i+1,j]+dy**2*P[i-1,j]+dx**2*P[i,j-1]-dx**2*dy**2*rhs)
+                else:
+                    
+                    P0[i,j] = 1/(2*dx**2+2*dy**2)*(dy**2*P[i+1,j]+dy**2*P[i-1,j]+dx**2*P[i,j-1]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+        error = LA.norm(P0.flatten() - P.flatten(), np.inf)
+        P = P0
+    return P
 
 #%% correction
-def correct_step(u_s,v_s, P, rho,dt, imax, imin, jmax, jmin, dx, dy):
+def correct_step(u_s,v_s, P, rho, dt, imax, imin, jmax, jmin, dx, dy):
     u_new = cp.deepcopy(u_s)
     v_new = cp.deepcopy(v_s)
-    
     # only updates interior nodes, correct boundary at the end
     for j in range(jmin,jmax+1):
         for i in range(imin+1, imax+1):
@@ -134,16 +161,16 @@ def boundary_corr(u,v, imin, imax, jmin, jmax):
     u_b[:,jmin-1] = 0 - u_b[:,jmin]
     # top
     u_b[:,jmax+1] = 2*1 - u_b[:,jmax]
-    # left 
-    u_b[imin,:] = 0
-    # right
-    u_b[imax,:] = 0
+    # # left 
+    # u_b[imin,:] = 0
+    # # right
+    # u_b[imax,:] = 0
 
     # u velocity boundary condition
-    # bottom
-    v_b[:,jmin] = 0
-    # top
-    v_b[:,jmax] = 0
+    # # bottom
+    # v_b[:,jmin] = 0
+    # # top
+    # v_b[:,jmax] = 0
     # left 
     v_b[imin-1,:] = 0 - v_b[imin,:]
     # right
@@ -182,3 +209,6 @@ for t in range(int(nt)):
     u, v = correct_step(u_s,v_s, P_updated, rho, dt, imax, imin, jmax, jmin, dx, dy)
     
     
+#%% plotting
+plt.figure()
+plt.imshow(u[imin:imax-1,jmin:jmax-1])
