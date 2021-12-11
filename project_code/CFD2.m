@@ -1,5 +1,5 @@
 Lx=30; Ly=30;
-nx=100;ny=100;
+nx=4;ny=4;
 imin =2; imax=imin+nx-1;
 jmin =2; jmax=jmin+ny-1;
 % Crea te mesh
@@ -12,3 +12,4 @@ dx=x ( imin+1)-x ( imin ) ;
 dy=y ( jmin+1)-y ( jmin ) ;
 dxi=1/dx ;
 dyi=1/dy ;
+
