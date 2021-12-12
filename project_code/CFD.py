@@ -8,20 +8,21 @@ import numpy as np
 import copy as cp
 from numpy import linalg as LA
 import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
 # Navier Stokes Solvers
 #%% Pysical setting
 # physical domain
 Lx = 30
 Ly = 30
-nx = 32
-ny = 32
+nx = 3
+ny = 3
 x0 = Lx/2
 y0 = Ly/2
 
 # physical parameter
 gamma = 1
 sigma = 2.5
-nu = 0.001
+nu = 1
 rho = 1
 
 # Index extents (without boundary domain)
@@ -76,36 +77,54 @@ def v_star(u,v,dt,dxi,dyi,nu):
     return v_s
 
 #%% pressure poisson solver
-# d2p/dx2 + d2p/dy2 = - rho/dt du_s/dx + dv_s/dy
-# def pressure_poisson_matrix():
-#     L = np.zeros([nx*ny,nx*ny])
-#     for j in range(ny):
-#         for i in range(nx):
-#             L[i-1+(j-1)*nx, i + (j)*nx] == 2*dxi**2+2*dyi**2
-#             for ii in range(i-1,i+2,2):
-#                 if ii>-1 and ii<=nx:
-#                     L[i+(j)*nx,ii+(j)*nx] = -dxi**2
-#                 else:
-#                     L[i+(j)*nx,i+(j)*nx] -= dxi**2
+
+def pressure_poisson_matrix(u_s,v_s):
+    L = np.zeros([nx*ny,nx*ny])
+    for j in range(ny):
+        for i in range(nx):
+            L[i+(j)*nx, i + (j)*nx] = 2*dxi**2+2*dyi**2
+            for ii in range(i-1,i+2,2):
+                if ii>=0 and ii<nx:
+                    L[i+(j)*nx,ii+(j)*nx] = -dxi**2
+                else:
+                    L[i+(j)*nx,i+(j)*nx] -= dxi**2
             
-#             for jj in range(j-1,j+2,2):
-#                 if jj>-1 and jj<= ny:
-#                     L[i+(j)*nx,i+(jj)*nx] = -dyi**2
-#                 else:
-#                     L[i+(j)*nx,i+(j)*nx] -= dyi**2
-#     L[0,:] = 0
-#     L[0,0] = 1
-#     return L  
-# def pressure_poisson_matrix():
-#     diag1 = -2*np.ones([1,nx]).flatten()
-#     diag2 = np.ones([1,nx-1]).flatten()
-#     A = np.diag(diag1) + np.diag(diag2,k=-1) + np.diag(diag2,k=1)
-#     A[0,0] = -1
-#     A[-1,-1] = -1
+            for jj in range(j-1,j+2,2):
+                if jj>=0 and jj< ny:
+                    L[i+(j)*nx,i+(jj)*nx] = -dyi**2
+                else:
+                    L[i+(j)*nx,i+(j)*nx] -= dyi**2
+    L[0,:] = 0
+    L[0,0] = 1
     
+    R = RHS(u_s,v_s)
     
-#     M = np.kron(A,A)/dx**2
-# L =         pressure_poisson_matrix()  
+    P_v = spsolve(L,R)
+    
+    n = 0
+    p = np.zeros([imax,jmax])
+    for j in range(jmin,jmax):
+        for i in range(imin,imax):
+            p[i,j] = P_v[n]
+            n = n+1
+    return p
+def RHS(u_s,v_s):
+    n = 0
+    R = []
+    for j in range(jmin,jmax+1):
+        for i in range(imin,imax+1):
+            n += 1 
+            cur_r = (-rho/dt)*((u_s[i+1,j]-u_s[i,j])*dxi+(v_s[i,j+1]-v_s[i,j])*dyi)
+            R.append(cur_r)
+    R = np.array(R)
+    return R.reshape(-1,1)
+
+
+
+
+
+    
+ 
 def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
     P0 = cp.deepcopy(P)
     error = np.inf
@@ -115,6 +134,7 @@ def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
                 rhs = rho/dt*((u_s[i+1,j] - u_s[i,j])/dx + (v_s[i,j+1] - v_s[i,j])/dy)
                 if i == imin and j == jmin: # (0,0)
                     P0[i,j] = 1/(dx**2+dy**2)*(dy**2*P[i+1,j]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
+                    # P0[i,j] = 0
                 elif i == imax-1 and j == jmin: #right bc
                     P0[i,j] = 1/(dx**2+dy**2)*(dy**2*P[i+1,j]+dx**2*P[i,j+1]-dx**2*dy**2*rhs)
                 elif i == imin and j == jmax-1: # bottom bc
@@ -141,8 +161,8 @@ def correct_step(u_s,v_s, P, rho, dt, imax, imin, jmax, jmin, dx, dy):
     u_new = cp.deepcopy(u_s)
     v_new = cp.deepcopy(v_s)
     # only updates interior nodes, correct boundary at the end
-    for j in range(jmin,jmax+1):
-        for i in range(imin+1, imax+1):
+    for j in range(jmin,jmax):
+        for i in range(imin+1, imax):
             u_new[i,j] = u_s[i,j] - dt/rho*(P[i,j]-P[i-1,j])/dx # update v
             
     for j in range(jmin+1, jmax):
@@ -204,11 +224,12 @@ for t in range(int(nt)):
     u_s = u_star(u,v,dt,dxi,dyi,nu)
     v_s = v_star(u,v,dt,dxi,dyi,nu)
     
-    P_updated = pressure_poisson(P, u_s, v_s, rho, dt, dx, dy,  imin, imax, jmin, jmax)
+    # P_updated = pressure_poisson_matrix(u_s,v_s)
+    P_updated  = pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax)
     
     u, v = correct_step(u_s,v_s, P_updated, rho, dt, imax, imin, jmax, jmin, dx, dy)
     
     
 #%% plotting
 plt.figure()
-plt.imshow(u[imin:imax-1,jmin:jmax-1])
+plt.contourf(u[imin:imax,jmin:jmax])
