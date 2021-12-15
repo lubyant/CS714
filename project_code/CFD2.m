@@ -1,7 +1,7 @@
 clear;
 clc;
-Lx=30; Ly=30;
-nx=3;ny=3;nu = 1;
+Lx=1; Ly=1;
+nx=3;ny=3;nu = 0.01;
 imin =2; imax=imin+nx-1;
 jmin =2; jmax=jmin+ny-1;
 dt = 0.001;rho = 1;
@@ -15,7 +15,7 @@ dx=x ( imin+1)-x ( imin ) ;
 dy=y ( jmin+1)-y ( jmin ) ;
 dxi=1/dx ;
 dyi=1/dy ;
-v = zeros(imax+1,jmax+1); u = zeros(imax+1,jmax+1);us = zeros(imax+1,jmax+1);vs = zeros(imax+1,jmax+1);
+v = zeros(imax+1,jmax+1); u = zeros(imax+1,jmax+1);us = zeros(imax+1,jmax+1);vs = zeros(imax+1,jmax+1);p=zeros ( imax , jmax ) ;
 %%
 for t = 1:1/dt
 
@@ -92,14 +92,15 @@ R = reshape(R,[],1);
 pv = L\R;
 
 n=0;
-p=zeros ( imax , jmax ) ;
+p_k=zeros ( imax , jmax ) ;
 for j=jmin : jmax
     for i=imin : imax
         n=n+1;
-        p ( i , j )=pv ( n ) ;
+        p_k ( i , j )=pv ( n ) ;
     end
 end
 
+p = p + p_k;
 
 for j=jmin : jmax
     for i=imin +1:imax
@@ -114,8 +115,11 @@ end
 
 end
 figure()
-contourf(u(imin:imax+1,jmin:jmax+1))
+contourf(u(imin:imax,jmin:jmax))
 colorbar;
 figure()
 m = sqrt(u.^2+v.^2);
 contourf(m)
+figure()
+contourf(p(imin:imax,jmin:jmax))
+colorbar

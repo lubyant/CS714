@@ -203,16 +203,16 @@ def boundary_corr(u,v, imin, imax, jmin, jmax):
 
 
 #%% initialization
-# # u velocity
-# fu = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(x-x0)/sigma**2)
-# # v velocity
-# fv = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(y-y0)/sigma**2)
+# u velocity
+fu = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(x-x0)/sigma**2)
+# v velocity
+fv = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(y-y0)/sigma**2)
 
-# u_0 = fu(x,y)
-# v_0 = fu(x,y)
+u_0 = fu(x,y)
+v_0 = fu(x,y)
 
-u = np.zeros([nx+2,nx+2])
-v = np.zeros([nx+2,nx+2])
+# u = np.zeros([nx+2,nx+2])
+# v = np.zeros([nx+2,nx+2])
 P_updated = np.zeros([nx+1,nx+1])
 
 #%% runing the iteration
