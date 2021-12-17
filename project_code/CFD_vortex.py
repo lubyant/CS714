@@ -9,13 +9,14 @@ import copy as cp
 from numpy import linalg as LA
 import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
+from matplotlib import cm
 # Navier Stokes Solvers
 #%% Pysical setting
 # physical domain
-Lx = 1
-Ly = 1
-nx = 32
-ny = 32
+Lx = 30
+Ly = 30
+nx = 16
+ny = 16
 x0 = Lx/2
 y0 = Ly/2
 
@@ -24,8 +25,9 @@ Re = 100
 u_top = 1
 gamma = 1
 sigma = 2.5
-nu = 0.01
-rho = u_top*Lx/Re
+nu = u_top*Lx/Re
+nu = 0.001
+rho = 1
 
 # Index extents (without boundary domain)
 imin = 1
@@ -120,13 +122,7 @@ def RHS(u_s,v_s):
             cur_r = (-rho/dt)*((u_s[i+1,j]-u_s[i,j])*dxi+(v_s[i,j+1]-v_s[i,j])*dyi)
             R.append(cur_r)
     R = np.array(R)
-    return R.reshape(-1,1)
-
-
-
-
-
-    
+    return R.reshape(-1,1)   
  
 def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
     P0 = cp.deepcopy(P)
@@ -159,6 +155,10 @@ def pressure_poisson(P, u_s, v_s, rho, dt, dx, dy, imin, imax, jmin, jmax):
         P = P0
     return P
 
+def plot_uvp():
+    
+    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+
 #%% correction
 def correct_step(u_s,v_s, P, rho, dt, imax, imin, jmax, jmin, dx, dy):
     u_new = cp.deepcopy(u_s)
@@ -181,19 +181,19 @@ def boundary_corr(u,v, imin, imax, jmin, jmax):
     
     # u velocity boundary condition
     # bottom
-    u_b[:,jmin-1] = 0 - u_b[:,jmin]
+    u_b[:,jmin-1] = u_b[:,jmin]
     # top
-    u_b[:,jmax+1] = 2*1 - u_b[:,jmax]
-    # # left 
-    # u_b[imin,:] = 0
-    # # right
-    # u_b[imax,:] = 0
+    u_b[:,jmax+1] = u_b[:,jmax]
+    # left 
+    u_b[imin,:] = 1
+    # right
+    u_b[imax,:] = 0
 
     # u velocity boundary condition
-    # # bottom
-    # v_b[:,jmin] = 0
+    # bottom
+    v_b[:,jmin] = 0
     # # top
-    # v_b[:,jmax] = 0
+    v_b[:,jmax] = 0
     # left 
     v_b[imin-1,:] = 0 - v_b[imin,:]
     # right
@@ -204,20 +204,25 @@ def boundary_corr(u,v, imin, imax, jmin, jmax):
 
 #%% initialization
 # u velocity
-fu = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(x-x0)/sigma**2)
+fu = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(y-y0)/sigma**2)
 # v velocity
-fv = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*(-(y-y0)/sigma**2)
+fv = lambda x,y : np.exp(-((x-x0)**2+(y-y0)**2)/2/sigma**2)*((x-x0)/sigma**2)
 
-u_0 = fu(x,y)
-v_0 = fu(x,y)
 
-# u = np.zeros([nx+2,nx+2])
-# v = np.zeros([nx+2,nx+2])
+
+u = np.zeros([nx+2,nx+2])
+v = np.zeros([nx+2,nx+2])
+
+for j in range(len(v)):
+    for i in range(len(u)):
+        u[i,j] = fu(x[0,i],y[0,j])
+        v[i,j] = fv(x[0,i],y[0,j])
+        
 P_updated = np.zeros([nx+1,nx+1])
 
 #%% runing the iteration
 epoch = 100
-T = 5
+T = 0.01
 dt = 0.001
 nt = T/dt
 
@@ -232,9 +237,11 @@ for t in range(int(nt)):
     
     u, v = correct_step(u_s,v_s, P_updated, rho, dt, imax, imin, jmax, jmin, dx, dy)
     
-    
+    if t % 10 ==0:
+        plot_uvp()
 #%% plotting
 plt.figure()
+
 X,Y = np.meshgrid(x,y)
 plt.contourf(u[imin:imax,jmin:jmax].T,levels=20)
 
@@ -249,3 +256,11 @@ plt.scatter(grid,ref,label='Ghia(1982) results',color='red')
 plt.xlabel('y/L')
 plt.ylabel('u')
 plt.legend()
+
+
+fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+surf = ax.plot_surface(X,Y, np.array(u,dtype='float'),cmap=cm.coolwarm,
+                       linewidth=0, antialiased=False)
+fig.colorbar(surf, shrink=0.1, aspect=2)
+plt.title('Pressure at 1s')
+plt.show()
