@@ -111,6 +111,8 @@ def pressure_poisson_matrix(u_s,v_s):
             n = n+1
     
     return p
+
+
 def RHS(u_s,v_s):
     n = 0
     R = []
@@ -234,9 +236,12 @@ for t in range(int(nt)):
     
     
 #%% plotting
-plt.figure()
-X,Y = np.meshgrid(x,y)
-plt.contourf(u[imin:imax,jmin:jmax].T,levels=20)
+plt.figure(figsize=(8,6),dpi=80)
+X,Y = np.meshgrid(x[0,imin:imax+1],y[0,jmin:jmax+1])
+plt.contourf(X,Y,u[imin:imax+1,jmin:jmax+1].T,levels=20)
+plt.colorbar()
+plt.xlabel('x')
+plt.ylabel('y')
 
 plt.figure()
 u_c = u[15,:]
